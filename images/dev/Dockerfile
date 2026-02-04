@@ -1,50 +1,56 @@
-# Dockerfile
-
 FROM mcr.microsoft.com/devcontainers/universal:2
 
-# Switch to root user
 USER root
 
-# Set default environment variables (can be overridden at runtime)
 ENV ROOT_PASSWORD=""
 ENV CODESPACE_PASSWORD=""
 ENV SSH_PORT=22
+ENV DEBIAN_FRONTEND=noninteractive
 
-# Install openssh-server and other tools
-RUN apt-get update && apt-get install -y \
-    openssh-server \
-    sudo \
-    net-tools \
-    iputils-ping \
-    vim \
-    && rm -rf /var/lib/apt/lists/*
+# Fix any existing apt issues and clean
+RUN dpkg --configure -a || true && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* /var/lib/dpkg/lock* && \
+    mkdir -p /var/lib/apt/lists/partial
 
-# Create SSH run directory
+# Update and install with retry
+RUN set -e; \
+    for i in 1 2 3; do \
+        apt-get update && \
+        apt-get install -y --no-install-recommends --fix-missing \
+            openssh-server \
+            sudo \
+            net-tools \
+            iputils-ping \
+            vim \
+        && break || { \
+            echo "Attempt $i failed, retrying..."; \
+            sleep 5; \
+            apt-get clean; \
+            rm -rf /var/lib/apt/lists/*; \
+        }; \
+    done && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Create SSH directory
 RUN mkdir -p /var/run/sshd
 
 # Configure SSH
-RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config \
-    && sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config \
-    && sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config \
-    && sed -i 's/#Port 22/Port 22/' /etc/ssh/sshd_config \
-    && sed -i 's/UsePAM yes/UsePAM no/' /etc/ssh/sshd_config
+RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config && \
+    sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config && \
+    sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config && \
+    sed -i 's/UsePAM yes/UsePAM no/' /etc/ssh/sshd_config
 
-# Ensure codespace user has sudo privileges
-RUN usermod -aG sudo codespace \
-    && echo 'codespace ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+# Configure user
+RUN usermod -aG sudo codespace 2>/dev/null || true && \
+    echo 'codespace ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
-# Copy entrypoint script
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
-# Expose SSH port
 EXPOSE 22
-
-# Set working directory
 WORKDIR /workspace
 
-# Use entrypoint script
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-
-# Default command
 CMD ["/usr/sbin/sshd", "-D"]
