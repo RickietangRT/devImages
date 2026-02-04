@@ -3,6 +3,8 @@ name: Build and Push Docker Images
 on:
   push:
     branches: [ "master" ]
+  schedule:
+    - cron: '44 3 * * *'
 
 env:
   REGISTRY: ghcr.io
@@ -142,7 +144,6 @@ jobs:
           
           echo "🔍 Checking registry for: $FULL_IMAGE"
           
-          # Use GitHub Container Registry API
           RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             "https://${{ env.REGISTRY }}/v2/${REPO_OWNER}/${IMAGE_NAME}/manifests/${IMAGE_TAG}")
@@ -161,23 +162,9 @@ jobs:
           echo "⏭️ Skipping build for ${{ steps.prepare.outputs.image_name }}:${{ steps.validate.outputs.image_tag }}"
           echo "Image already exists in registry"
 
-      # Set up QEMU for multi-platform builds
-      - name: Set up QEMU
-        if: steps.check-tag.outputs.skip != 'true'
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: linux/amd64,linux/arm64
-
-      # Set up Docker Buildx with proper configuration
       - name: Set up Docker Buildx
         if: steps.check-tag.outputs.skip != 'true'
         uses: docker/setup-buildx-action@v3
-        with:
-          version: latest
-          driver-opts: |
-            image=moby/buildkit:latest
-            network=host
-          buildkitd-flags: --debug
 
       - name: Log into registry ${{ env.REGISTRY }}
         if: steps.check-tag.outputs.skip != 'true'
@@ -197,7 +184,6 @@ jobs:
             type=raw,value=${{ steps.validate.outputs.image_tag }}
             type=raw,value=latest
 
-      # Build and push multi-platform image
       - name: Build and push Docker image
         if: steps.check-tag.outputs.skip != 'true'
         id: build-and-push
@@ -208,37 +194,12 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # Multi-platform build
-          platforms: linux/amd64,linux/arm64
-          # Disable attestations to avoid manifest issues
+          # AMD64 only (universal:2 doesn't support ARM64)
+          platforms: linux/amd64
           provenance: false
           sbom: false
-          # Proper output configuration
-          outputs: type=image,push=true
-          # Cache configuration
           cache-from: type=gha,scope=${{ steps.prepare.outputs.image_name }}
           cache-to: type=gha,mode=max,scope=${{ steps.prepare.outputs.image_name }}
-
-      - name: Verify multi-platform image
-        if: steps.check-tag.outputs.skip != 'true'
-        run: |
-          IMAGE_NAME="${{ steps.prepare.outputs.image_name }}"
-          IMAGE_TAG="${{ steps.validate.outputs.image_tag }}"
-          REPO_OWNER="${{ steps.prepare.outputs.repo_owner }}"
-          FULL_IMAGE="${{ env.REGISTRY }}/${REPO_OWNER}/${IMAGE_NAME}:${IMAGE_TAG}"
-          
-          echo "🔍 Verifying multi-platform image: $FULL_IMAGE"
-          
-          # Wait for registry to sync
-          sleep 10
-          
-          # Check manifest
-          echo "📋 Manifest details:"
-          docker buildx imagetools inspect "$FULL_IMAGE"
-          
-          echo ""
-          echo "✅ Image built for platforms:"
-          docker buildx imagetools inspect "$FULL_IMAGE" --raw | jq -r '.manifests[].platform | "\(.os)/\(.architecture)"'
 
       - name: Install cosign
         if: steps.check-tag.outputs.skip != 'true'
@@ -270,21 +231,11 @@ jobs:
             echo "- **Image:** ${{ steps.prepare.outputs.image_name }}" >> $GITHUB_STEP_SUMMARY
             echo "- **Tag:** ${{ steps.validate.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
             echo "- **Digest:** ${{ steps.build-and-push.outputs.digest }}" >> $GITHUB_STEP_SUMMARY
-            echo "- **Platforms:** linux/amd64, linux/arm64" >> $GITHUB_STEP_SUMMARY
+            echo "- **Platform:** linux/amd64" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "### Pull Commands" >> $GITHUB_STEP_SUMMARY
+            echo "### Pull Command" >> $GITHUB_STEP_SUMMARY
             echo '```bash' >> $GITHUB_STEP_SUMMARY
-            echo "# Pull for your platform (auto-detect)" >> $GITHUB_STEP_SUMMARY
             echo "docker pull ${{ env.REGISTRY }}/${{ steps.prepare.outputs.repo_owner }}/${{ steps.prepare.outputs.image_name }}:${{ steps.validate.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "# Pull specific platform" >> $GITHUB_STEP_SUMMARY
-            echo "docker pull --platform linux/amd64 ${{ env.REGISTRY }}/${{ steps.prepare.outputs.repo_owner }}/${{ steps.prepare.outputs.image_name }}:${{ steps.validate.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
-            echo "docker pull --platform linux/arm64 ${{ env.REGISTRY }}/${{ steps.prepare.outputs.repo_owner }}/${{ steps.prepare.outputs.image_name }}:${{ steps.validate.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "### Inspect Manifest" >> $GITHUB_STEP_SUMMARY
-            echo '```bash' >> $GITHUB_STEP_SUMMARY
-            echo "docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ steps.prepare.outputs.repo_owner }}/${{ steps.prepare.outputs.image_name }}:${{ steps.validate.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
           else
             echo "❌ **Status:** Build failed" >> $GITHUB_STEP_SUMMARY
@@ -302,8 +253,3 @@ jobs:
           echo "## Workflow Complete 🎉" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "All image builds have been processed." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Multi-Platform Support" >> $GITHUB_STEP_SUMMARY
-          echo "Images are built for:" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ linux/amd64 (x86_64)" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ linux/arm64 (ARM64/Apple Silicon)" >> $GITHUB_STEP_SUMMARY
