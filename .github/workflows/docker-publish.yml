@@ -10,11 +10,12 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
-  # Job 1: Discover all images
   discover:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
+      has-images: ${{ steps.set-matrix.outputs.has-images }}
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -22,21 +23,58 @@ jobs:
       - name: Discover images
         id: set-matrix
         run: |
-          # Find all directories in images/ that contain a Dockerfile
-          images=$(find images -maxdepth 1 -mindepth 1 -type d -exec basename {} \; | jq -R -s -c 'split("\n")[:-1]')
-          echo "matrix=$images" >> $GITHUB_OUTPUT
-          echo "Found images: $images"
+          echo "🔍 Discovering images in images/ directory..."
+          
+          if [ ! -d "images" ]; then
+            echo "❌ images/ directory not found"
+            echo "matrix=[]" >> $GITHUB_OUTPUT
+            echo "has-images=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          images_array=()
+          for dir in images/*/; do
+            if [ -d "$dir" ]; then
+              image_name=$(basename "$dir")
+              dockerfile="$dir/Dockerfile"
+              tagfile="$dir/tag"
+              
+              if [ ! -f "$dockerfile" ]; then
+                echo "⚠️  Skipping $image_name: Dockerfile not found"
+                continue
+              fi
+              
+              if [ ! -f "$tagfile" ]; then
+                echo "⚠️  Skipping $image_name: tag file not found"
+                continue
+              fi
+              
+              images_array+=("$image_name")
+              echo "✅ Found: $image_name"
+            fi
+          done
+          
+          if [ ${#images_array[@]} -eq 0 ]; then
+            echo "⚠️  No valid images found"
+            echo "matrix=[]" >> $GITHUB_OUTPUT
+            echo "has-images=false" >> $GITHUB_OUTPUT
+          else
+            matrix_json=$(printf '%s\n' "${images_array[@]}" | jq -R . | jq -s -c .)
+            echo "matrix=$matrix_json" >> $GITHUB_OUTPUT
+            echo "has-images=true" >> $GITHUB_OUTPUT
+            echo "📦 Total images to process: ${#images_array[@]}"
+          fi
 
-  # Job 2: Build and push each image
   build:
     needs: discover
     runs-on: ubuntu-latest
-    if: needs.discover.outputs.matrix != '[]'
+    if: needs.discover.outputs.has-images == 'true'
     
     strategy:
       matrix:
         image: ${{ fromJson(needs.discover.outputs.matrix) }}
       fail-fast: false
+      max-parallel: 3
     
     permissions:
       contents: read
@@ -47,44 +85,88 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Read image tag
-        id: read-tag
+      - name: Prepare image name (lowercase)
+        id: prepare
         run: |
           IMAGE_NAME="${{ matrix.image }}"
-          TAG_FILE="images/${IMAGE_NAME}/tag"
+          # Convert to lowercase
+          IMAGE_NAME_LOWER=$(echo "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')
+          
+          # Convert repository owner to lowercase
+          REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          
+          echo "image_name=$IMAGE_NAME_LOWER" >> $GITHUB_OUTPUT
+          echo "repo_owner=$REPO_OWNER" >> $GITHUB_OUTPUT
+          echo "✅ Image name: $IMAGE_NAME_LOWER"
+          echo "✅ Repository owner: $REPO_OWNER"
+
+      - name: Validate image structure
+        id: validate
+        run: |
+          IMAGE_NAME="${{ matrix.image }}"
+          IMAGE_DIR="images/${IMAGE_NAME}"
+          DOCKERFILE="${IMAGE_DIR}/Dockerfile"
+          TAG_FILE="${IMAGE_DIR}/tag"
+          
+          echo "🔍 Validating image: $IMAGE_NAME"
+          
+          if [ ! -f "$DOCKERFILE" ]; then
+            echo "❌ Dockerfile not found: $DOCKERFILE"
+            exit 1
+          fi
+          echo "✅ Dockerfile found"
           
           if [ ! -f "$TAG_FILE" ]; then
             echo "❌ Tag file not found: $TAG_FILE"
             exit 1
           fi
+          echo "✅ Tag file found"
           
           IMAGE_TAG=$(cat "$TAG_FILE" | tr -d '[:space:]')
-          
           if [ -z "$IMAGE_TAG" ]; then
-            echo "❌ Tag file is empty: $TAG_FILE"
+            echo "❌ Tag file is empty"
             exit 1
           fi
           
-          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
-          echo "✅ Image: $IMAGE_NAME, Tag: $IMAGE_TAG"
+          # Convert tag to lowercase as well
+          IMAGE_TAG_LOWER=$(echo "$IMAGE_TAG" | tr '[:upper:]' '[:lower:]')
+          
+          if [[ ! "$IMAGE_TAG_LOWER" =~ ^[a-z0-9._-]+$ ]]; then
+            echo "❌ Invalid tag format: $IMAGE_TAG_LOWER"
+            exit 1
+          fi
+          
+          echo "image_tag=$IMAGE_TAG_LOWER" >> $GITHUB_OUTPUT
+          echo "✅ Tag validated: $IMAGE_TAG_LOWER"
 
-      - name: Check if image tag exists
+      - name: Check if image tag exists in registry
         id: check-tag
+        continue-on-error: true
         run: |
-          IMAGE_NAME="${{ matrix.image }}"
-          IMAGE_TAG="${{ steps.read-tag.outputs.image_tag }}"
-          FULL_IMAGE="${{ env.REGISTRY }}/${{ github.repository_owner }}/${IMAGE_NAME}:${IMAGE_TAG}"
+          IMAGE_NAME="${{ steps.prepare.outputs.image_name }}"
+          IMAGE_TAG="${{ steps.validate.outputs.image_tag }}"
+          REPO_OWNER="${{ steps.prepare.outputs.repo_owner }}"
+          FULL_IMAGE="${{ env.REGISTRY }}/${REPO_OWNER}/${IMAGE_NAME}:${IMAGE_TAG}"
           
-          echo "Checking if image exists: $FULL_IMAGE"
+          echo "🔍 Checking registry for: $FULL_IMAGE"
           
-          # Try to pull the image manifest
-          if docker manifest inspect "$FULL_IMAGE" > /dev/null 2>&1; then
-            echo "✅ Image tag already exists: $FULL_IMAGE"
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            "https://${{ env.REGISTRY }}/v2/${REPO_OWNER}/${IMAGE_NAME}/manifests/${IMAGE_TAG}")
+          
+          if [ "$RESPONSE" = "200" ]; then
+            echo "✅ Image tag already exists in registry"
             echo "skip=true" >> $GITHUB_OUTPUT
           else
-            echo "🔨 Image tag does not exist, will build: $FULL_IMAGE"
+            echo "🔨 Image tag not found in registry (HTTP $RESPONSE)"
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
+
+      - name: Skip notification
+        if: steps.check-tag.outputs.skip == 'true'
+        run: |
+          echo "⏭️ Skipping build for ${{ steps.prepare.outputs.image_name }}:${{ steps.validate.outputs.image_tag }}"
+          echo "Image already exists in registry"
 
       - name: Set up Docker Buildx
         if: steps.check-tag.outputs.skip != 'true'
@@ -98,18 +180,28 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Extract Docker metadata
+        if: steps.check-tag.outputs.skip != 'true'
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ steps.prepare.outputs.repo_owner }}/${{ steps.prepare.outputs.image_name }}
+          tags: |
+            type=raw,value=${{ steps.validate.outputs.image_tag }}
+            type=raw,value=latest
+
       - name: Build and push Docker image
         if: steps.check-tag.outputs.skip != 'true'
+        id: build-and-push
         uses: docker/build-push-action@v5
         with:
           context: ./images/${{ matrix.image }}
           file: ./images/${{ matrix.image }}/Dockerfile
           push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image }}:${{ steps.read-tag.outputs.image_tag }}
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image }}:latest
-          cache-from: type=gha,scope=${{ matrix.image }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ steps.prepare.outputs.image_name }}
+          cache-to: type=gha,mode=max,scope=${{ steps.prepare.outputs.image_name }}
 
       - name: Install cosign
         if: steps.check-tag.outputs.skip != 'true'
@@ -120,19 +212,41 @@ jobs:
       - name: Sign the published Docker image
         if: steps.check-tag.outputs.skip != 'true'
         env:
-          IMAGE_NAME: ${{ matrix.image }}
-          IMAGE_TAG: ${{ steps.read-tag.outputs.image_tag }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+          DIGEST: ${{ steps.build-and-push.outputs.digest }}
         run: |
-          FULL_IMAGE="${{ env.REGISTRY }}/${{ github.repository_owner }}/${IMAGE_NAME}:${IMAGE_TAG}"
-          cosign sign --yes "$FULL_IMAGE"
-          
-          LATEST_IMAGE="${{ env.REGISTRY }}/${{ github.repository_owner }}/${IMAGE_NAME}:latest"
-          cosign sign --yes "$LATEST_IMAGE"
+          echo "🔐 Signing images..."
+          echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
 
-      - name: Image build summary
+      - name: Build summary
+        if: always()
         run: |
+          echo "## Build Summary for ${{ steps.prepare.outputs.image_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
           if [ "${{ steps.check-tag.outputs.skip }}" = "true" ]; then
-            echo "⏭️ Skipped: Image already exists"
+            echo "⏭️ **Status:** Skipped (image already exists)" >> $GITHUB_STEP_SUMMARY
+            echo "- **Image:** ${{ steps.prepare.outputs.image_name }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Tag:** ${{ steps.validate.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ steps.build-and-push.outcome }}" = "success" ]; then
+            echo "✅ **Status:** Successfully built and pushed" >> $GITHUB_STEP_SUMMARY
+            echo "- **Image:** ${{ steps.prepare.outputs.image_name }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Tag:** ${{ steps.validate.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Digest:** ${{ steps.build-and-push.outputs.digest }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Full Image:** ${{ env.REGISTRY }}/${{ steps.prepare.outputs.repo_owner }}/${{ steps.prepare.outputs.image_name }}:${{ steps.validate.outputs.image_tag }}" >> $GITHUB_STEP_SUMMARY
           else
-            echo "✅ Built and pushed: ${{ matrix.image }}:${{ steps.read-tag.outputs.image_tag }}"
+            echo "❌ **Status:** Build failed" >> $GITHUB_STEP_SUMMARY
+            echo "- **Image:** ${{ steps.prepare.outputs.image_name }}" >> $GITHUB_STEP_SUMMARY
           fi
+
+  summary:
+    needs: [discover, build]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Workflow summary
+        run: |
+          echo "## Workflow Complete 🎉" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All image builds have been processed." >> $GITHUB_STEP_SUMMARY
