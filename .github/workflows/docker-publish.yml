@@ -23,17 +23,17 @@ jobs:
       - name: Discover images
         id: set-matrix
         run: |
-          echo "🔍 Discovering images in images/ directory..."
+          echo "🔍 Discovering images in devImages/ directory..."
           
-          if [ ! -d "images" ]; then
-            echo "❌ images/ directory not found"
+          if [ ! -d "devImages" ]; then
+            echo "❌ devImages/ directory not found"
             echo "matrix=[]" >> $GITHUB_OUTPUT
             echo "has-images=false" >> $GITHUB_OUTPUT
             exit 0
           fi
           
           images_array=()
-          for dir in images/*/; do
+          for dir in devImages/*/; do
             if [ -d "$dir" ]; then
               image_name=$(basename "$dir")
               dockerfile="$dir/Dockerfile"
@@ -101,7 +101,7 @@ jobs:
         id: validate
         run: |
           IMAGE_NAME="${{ matrix.image }}"
-          IMAGE_DIR="images/${IMAGE_NAME}"
+          IMAGE_DIR="devImages/${IMAGE_NAME}"
           DOCKERFILE="${IMAGE_DIR}/Dockerfile"
           TAG_FILE="${IMAGE_DIR}/tag"
           
@@ -189,12 +189,11 @@ jobs:
         id: build-and-push
         uses: docker/build-push-action@v5
         with:
-          context: ./images/${{ matrix.image }}
-          file: ./images/${{ matrix.image }}/Dockerfile
+          context: ./devImages/${{ matrix.image }}
+          file: ./devImages/${{ matrix.image }}/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # AMD64 only (universal:2 doesn't support ARM64)
           platforms: linux/amd64
           provenance: false
           sbom: false
