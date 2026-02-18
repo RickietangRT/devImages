@@ -6,3 +6,4 @@ RUN curl https://binaries.twingate.com/client/linux/ARCH/x86_64/stable/twingate-
 RUN pacman -Syy
 RUN pacman -U --noconfirm twingate.pkg.tar.zst
 # After installation, configure the client by running: sudo twingate setup
+ 
