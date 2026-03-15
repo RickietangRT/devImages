@@ -35,6 +35,7 @@ RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@${PROTOC_GEN_GO_VER}
     cp /root/go/bin/protoc-gen-go-grpc /usr/local/bin/
 
 RUN npm install -g protoc-gen-ts
-RUN pip3 install --no-cache-dir grpcio grpcio-tools
+RUN python3 --version && pip3 --version && pip3 install --no-cache-dir --break-system-packages grpcio grpcio-tools
+
 
 WORKDIR /workspace
