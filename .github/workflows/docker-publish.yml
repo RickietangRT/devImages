@@ -203,8 +203,6 @@ jobs:
       - name: Install cosign
         if: steps.check-tag.outputs.skip != 'true'
         uses: sigstore/cosign-installer@v4.1.0
-        with:
-          cosign-release: 'v4.1.0'
 
       - name: Sign the published Docker image
         if: steps.check-tag.outputs.skip != 'true'
