@@ -1,5 +1,4 @@
 # --- Stage 1: Go Plugin Builder ---
-# 使用官方 Go 鏡像編譯插件，解決缺少 git 和環境變數的問題
 FROM golang:1.23-alpine AS go-builder
 
 # 安裝 git (go install 需要)
@@ -10,21 +9,34 @@ RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest && \
     go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
 # --- Stage 2: Rust Plugin Builder ---
-# 使用官方 Rust 鏡像編譯插件
+# 使用官方 Rust Alpine 鏡像
 FROM rust:1.76-alpine AS rust-builder
 
-# 安裝 musl-dev (C 綁定需要)
-RUN apk add --no-cache musl-dev
+# 關鍵修復：安裝編譯所需的 C 庫、OpenSSL 和 Protobuf 編譯器
+# protobuf-dev: 很多 Rust 插件在編譯時需要調用 protoc
+# openssl-dev & pkgconfig: 處理網絡和加密依賴
+# build-base: 提供 gcc/g++ 等編譯工具
+RUN apk add --no-cache \
+    musl-dev \
+    openssl-dev \
+    pkgconfig \
+    protobuf-dev \
+    build-base \
+    git
 
-# 安裝 Rust 插件 (這一步會花一點時間編譯)
-RUN cargo install protoc-gen-prost protoc-gen-tonic protoc-gen-prost-crate
+# 分開安裝以隔離錯誤，並設置特定版本以保證穩定性
+# protoc-gen-prost: 生成消息結構體
+# protoc-gen-tonic: 生成 gRPC 服務代碼
+# protoc-gen-prost-crate: 輔助工具 (可選，這裡保留以防萬一)
+RUN cargo install protoc-gen-prost && \
+    cargo install protoc-gen-tonic && \
+    cargo install protoc-gen-prost-crate
 
 # --- Stage 3: Final Image ---
-# 最終鏡像，保持乾淨
 FROM bufbuild/buf:1.28.1
 
-# 1. 安裝運行時環境 (Python, Java, Node.js)
-# 不需要安裝 go 和 cargo 編譯器了
+# 1. 安裝運行時環境
+# libgcc, libstdc++, gcompat: 雖然 Rust 通常靜態鏈接，但某些依賴可能需要這些庫
 RUN apk add --no-cache \
     python3 \
     py3-pip \
@@ -33,8 +45,9 @@ RUN apk add --no-cache \
     openjdk17-jre \
     curl \
     bash \
-    gcompat 
-    # gcompat 用於提高某些二進制文件的兼容性
+    gcompat \
+    libgcc \
+    libstdc++
 
 # 2. 從 Stage 1 複製 Go 插件
 COPY --from=go-builder /go/bin/protoc-gen-go /usr/local/bin/
@@ -43,6 +56,7 @@ COPY --from=go-builder /go/bin/protoc-gen-go-grpc /usr/local/bin/
 # 3. 從 Stage 2 複製 Rust 插件
 COPY --from=rust-builder /usr/local/cargo/bin/protoc-gen-prost /usr/local/bin/
 COPY --from=rust-builder /usr/local/cargo/bin/protoc-gen-tonic /usr/local/bin/
+# 如果您不需要 prost-crate，可以註釋掉下面這行
 COPY --from=rust-builder /usr/local/cargo/bin/protoc-gen-prost-crate /usr/local/bin/
 
 # 4. 安裝 TypeScript Plugin
