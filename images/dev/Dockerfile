@@ -1,6 +1,6 @@
 FROM ubuntu:24.04
 
-RUN sudo apt-get update && sudo apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     git \
@@ -12,6 +12,7 @@ RUN sudo apt-get update && sudo apt-get install -y --no-install-recommends \
     software-properties-common \
     telnet \
     net-tools \
+    sudo \
     && rm -rf /var/lib/apt/lists/*
 
 RUN useradd -m -s /bin/bash DEV && \
