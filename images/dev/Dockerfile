@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
     telnet \
     net-tools \
-    grpcurl
+    grpcurl \
     && rm -rf /var/lib/apt/lists/*
 
 
