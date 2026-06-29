@@ -1,56 +1,52 @@
-FROM mcr.microsoft.com/devcontainers/universal:2
+FROM ubuntu:24.04
 
-USER root
-
-ENV ROOT_PASSWORD=""
-ENV CODESPACE_PASSWORD=""
-ENV SSH_PORT=22
+# 避免安裝過程中出現互動式環境提示
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Fix any existing apt issues and clean
-RUN dpkg --configure -a || true && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* /var/lib/dpkg/lock* && \
-    mkdir -p /var/lib/apt/lists/partial
 
-# Update and install with retry
-RUN set -e; \
-    for i in 1 2 3; do \
-        apt-get update && \
-        apt-get install -y --no-install-recommends --fix-missing \
-            openssh-server \
-            sudo \
-            net-tools \
-            iputils-ping \
-            vim \
-        && break || { \
-            echo "Attempt $i failed, retrying..."; \
-            sleep 5; \
-            apt-get clean; \
-            rm -rf /var/lib/apt/lists/*; \
-        }; \
-    done && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+ENV GO_VERSION=1.26.4
+ENV NODE_VERSION=20.x
+ENV DOTNET_VERSION=8.0
+ENV PROTOC_VERSION=26.1
 
-# Create SSH directory
-RUN mkdir -p /var/run/sshd
 
-# Configure SSH
-RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config && \
-    sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config && \
-    sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config && \
-    sed -i 's/UsePAM yes/UsePAM no/' /etc/ssh/sshd_config
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    wget \
+    git \
+    openssh-server \
+    openssh-client \
+    ca-certificates \
+    build-essential \
+    unzip \
+    software-properties-common \
+    telnet \
+    net-tools \
+    grpcurl
+    && rm -rf /var/lib/apt/lists/*
 
-# Configure user
-RUN usermod -aG sudo codespace 2>/dev/null || true && \
-    echo 'codespace ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
-COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+RUN apt update -y &&  apt install -y \
+  python3 \
+  python3-pip \
+  python3-venv \
+  python3-dev \
+  build-essential \
+  libssl-dev \
+  libffi-dev
 
-EXPOSE 22
-WORKDIR /workspace
+RUN /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+RUN CI=1 HOMEBREW_NO_AUTO_UPDATE=1 brew install go node python@3.14 rust openjdk proto protobuf opencode
 
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-CMD ["/usr/sbin/sshd", "-D"]
+RUN java -version && \
+    python3 --version && \
+    go version && \
+    node -v && \
+    npm -v && \
+    rustc --version && \
+    dotnet --version && \
+    protoc --version && \
+    git --version && \
+    ssh -V
+
+CMD ["opencode", "web", "--hostname", "0.0.0.0", "--log-level", "DEBUG"]
