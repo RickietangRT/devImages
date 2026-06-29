@@ -22,7 +22,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common \
     telnet \
     net-tools \
-    grpcurl \
     && rm -rf /var/lib/apt/lists/*
 
 
@@ -36,7 +35,7 @@ RUN apt update -y &&  apt install -y \
   libffi-dev
 
 RUN /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-RUN CI=1 HOMEBREW_NO_AUTO_UPDATE=1 brew install go node python@3.14 rust openjdk proto protobuf opencode
+RUN CI=1 HOMEBREW_NO_AUTO_UPDATE=1 brew install go node python@3.14 rust openjdk proto protobuf opencode grpcurl
 
 RUN java -version && \
     python3 --version && \
