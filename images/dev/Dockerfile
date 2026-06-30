@@ -38,7 +38,7 @@ RUN java -version && \
     dotnet --version && \
     protoc --version && \
     git --version && \
-    uvx -v && \
+    uvx -V && \
     ssh -V
 
 CMD ["opencode", "web", "--hostname", "0.0.0.0", "--log-level", "DEBUG"]
