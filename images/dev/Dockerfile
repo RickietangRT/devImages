@@ -13,6 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     telnet \
     net-tools \
     sudo \
+    nano \
+    postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 RUN useradd -m -s /bin/bash DEV && \
@@ -27,7 +29,11 @@ ENV PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:${PATH}
 RUN CI=1 HOMEBREW_NO_AUTO_UPDATE=1 brew install go node python@3.14 rust openjdk dotnet proto protobuf opencode grpcurl  homeport/tap/dyff
 
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+RUN curl https://clickhouse.com/cli | sh
+
 ENV PATH="/home/DEV/.local/bin:${PATH}"
+
+
 
 RUN java -version && \
     python3 --version && \
