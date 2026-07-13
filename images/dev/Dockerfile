@@ -30,7 +30,7 @@ RUN CI=1 HOMEBREW_NO_AUTO_UPDATE=1 brew install go node python@3.14 rust openjdk
 
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 RUN curl https://clickhouse.com/cli | sh
-
+RUN curl -fsSL https://code-server.dev/install.sh | sh
 ENV PATH="/home/DEV/.local/bin:${PATH}"
 
 
