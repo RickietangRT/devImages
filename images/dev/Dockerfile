@@ -32,7 +32,7 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 RUN curl https://clickhouse.com/cli | sh
 RUN curl -fsSL https://code-server.dev/install.sh | sh
 ENV PATH="/home/DEV/.local/bin:${PATH}"
-
+RUN npm install -g pm2 gitnexus @modelcontextprotocol/server-filesystem
 
 
 RUN java -version && \
