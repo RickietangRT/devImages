@@ -26,13 +26,16 @@ WORKDIR /home/DEV
 
 RUN NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ENV PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:${PATH}"
-RUN CI=1 HOMEBREW_NO_AUTO_UPDATE=1 brew install go node python@3.14 rust openjdk dotnet proto protobuf opencode grpcurl  homeport/tap/dyff
+RUN CI=1 HOMEBREW_NO_AUTO_UPDATE=1 brew install go node python@3.14 rust openjdk dotnet proto protobuf opencode grpcurl  homeport/tap/dyff rtk aovestdipaperino/tap/tokensave
 
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 RUN curl https://clickhouse.com/cli | sh
 RUN curl -fsSL https://code-server.dev/install.sh | sh
 ENV PATH="/home/DEV/.local/bin:${PATH}"
 RUN npm install -g pm2 gitnexus @modelcontextprotocol/server-filesystem
+RUN uv tool install "headroom-ai[all]"
+RUN curl -fsSL https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.sh | bash
+
 
 
 RUN java -version && \
