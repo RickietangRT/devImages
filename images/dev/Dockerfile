@@ -1,6 +1,9 @@
 FROM ghcr.io/openhands/agent-canvas:latest
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+USER openhands
+WORKDIR /home/openhands
+
+RUN sudo apt-get update && sudo apt-get install -y --no-install-recommends \
     curl \
     wget \
     git \
@@ -11,15 +14,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     unzip \
     telnet \
     net-tools \
-    sudo \
     nano \
     postgresql-client 
 
 # RUN useradd -m -s /bin/bash DEV && \
 #     echo 'DEV:DEV' | chpasswd && \
 #     echo 'DEV ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
-USER openhands
-WORKDIR /home/openhands
+
 
 RUN NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ENV PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:${PATH}"
