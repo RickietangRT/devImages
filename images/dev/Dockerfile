@@ -33,7 +33,7 @@ RUN curl https://clickhouse.com/cli | sh
 RUN curl -fsSL https://code-server.dev/install.sh | sh
 RUN npm install -g pm2 gitnexus @modelcontextprotocol/server-filesystem chrome-devtools-mcp@latest 
 RUN curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh
-RUN curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash
+RUN curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash -s -- --ui --skip-config
 RUN brew tap basicmachines-co/basic-memory && brew trust basicmachines-co/basic-memory && brew install basic-memory
 
 ENV PATH="/home/DEV/.local/bin:${PATH}"
