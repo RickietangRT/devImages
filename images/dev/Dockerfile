@@ -1,9 +1,6 @@
-FROM ghcr.io/openhands/agent-canvas:latest
+FROM ubuntu:24.04
 
-USER openhands
-WORKDIR /home/openhands
-
-RUN sudo apt-get update && sudo apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     git \
@@ -12,15 +9,20 @@ RUN sudo apt-get update && sudo apt-get install -y --no-install-recommends \
     ca-certificates \
     build-essential \
     unzip \
+    software-properties-common \
     telnet \
     net-tools \
+    sudo \
     nano \
-    postgresql-client 
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
 
-# RUN useradd -m -s /bin/bash DEV && \
-#     echo 'DEV:DEV' | chpasswd && \
-#     echo 'DEV ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+RUN useradd -m -s /bin/bash DEV && \
+    echo 'DEV:DEV' | chpasswd && \
+    echo 'DEV ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
+USER DEV
+WORKDIR /home/DEV
 
 RUN NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ENV PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:${PATH}"
@@ -29,11 +31,11 @@ RUN CI=1 HOMEBREW_NO_AUTO_UPDATE=1 brew install go node python@3.14 rust openjdk
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 RUN curl https://clickhouse.com/cli | sh
 RUN curl -fsSL https://code-server.dev/install.sh | sh
+RUN npm install -g pm2 gitnexus @modelcontextprotocol/server-filesystem chrome-devtools-mcp@latest 
+RUN curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh
+RUN curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash
+RUN uv tool install basic-memory
 ENV PATH="/home/DEV/.local/bin:${PATH}"
-RUN npm install -g pm2 gitnexus @modelcontextprotocol/server-filesystem
-RUN uv tool install "headroom-ai[all]"
-RUN curl -fsSL https://raw.githubusercontent.com/JuliusBrussee/caveman/main/install.sh | bash
-
 
 
 RUN java -version && \
@@ -48,4 +50,4 @@ RUN java -version && \
     uvx -V && \
     ssh -V
 
-CMD ["opencode", "web", "--hostname", "0.0.0.0", "--log-level", "DEBUG"]
+CMD ["opencode", "web", "--hostname", "0.0.0.0", "--log-level", "INFO"]
