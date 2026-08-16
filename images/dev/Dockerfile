@@ -26,12 +26,12 @@ WORKDIR /home/DEV
 
 RUN NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ENV PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:${PATH}"
-RUN CI=1 HOMEBREW_NO_AUTO_UPDATE=1 brew install go node python@3.14 rust openjdk dotnet proto protobuf opencode grpcurl  homeport/tap/dyff rtk aovestdipaperino/tap/tokensave
+RUN CI=1 HOMEBREW_NO_AUTO_UPDATE=1 brew install go node python@3.14 rust openjdk dotnet proto protobuf opencode grpcurl homeport/tap/dyff rtk aovestdipaperino/tap/tokensave gost
 
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 RUN curl https://clickhouse.com/cli | sh
 RUN curl -fsSL https://code-server.dev/install.sh | sh
-RUN npm install -g pm2 gitnexus @modelcontextprotocol/server-filesystem chrome-devtools-mcp@latest 
+RUN npm install -g pm2 gitnexus @modelcontextprotocol/server-filesystem chrome-devtools-mcp@latest @deepseek-ai/dsh
 RUN curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh
 RUN curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash -s -- --ui --skip-config
 RUN brew tap basicmachines-co/basic-memory && brew trust basicmachines-co/basic-memory && brew install basic-memory
