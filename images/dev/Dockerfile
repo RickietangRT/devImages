@@ -32,7 +32,7 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 RUN curl https://clickhouse.com/cli | sh
 RUN curl -fsSL https://code-server.dev/install.sh | sh
 RUN npm install -g pm2 gitnexus chrome-devtools-mcp@latest @deepseek-ai/dsh
-RUN curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash -s  --skip-config
+RUN curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash -s -- --skip-config
 RUN uv tool install -p 3.13 serena-agent
 
 ENV PATH="${GOPATH}$/bin:/home/DEV/.local/bin:${PATH}"
