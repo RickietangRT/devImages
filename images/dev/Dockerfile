@@ -35,7 +35,7 @@ RUN npm install -g pm2 gitnexus chrome-devtools-mcp@latest @deepseek-ai/dsh
 RUN curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash -s -- --ui --skip-config
 RUN uv tool install -p 3.13 serena-agent
 
-ENV PATH="$GOPATH/bin:/home/DEV/.local/bin:${PATH}"
+ENV PATH="${GOPATH}/bin:/home/DEV/.local/bin:${PATH}"
 
 RUN java -version && \
     python3 --version && \
