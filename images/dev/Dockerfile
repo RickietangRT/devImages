@@ -33,9 +33,9 @@ RUN curl https://clickhouse.com/cli | sh
 RUN curl -fsSL https://code-server.dev/install.sh | sh
 RUN npm install -g pm2 gitnexus chrome-devtools-mcp@latest @deepseek-ai/dsh
 RUN curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash -s -- --skip-config
-RUN uv tool install -p 3.13 serena-agent
 
-ENV PATH="${GOPATH}$/bin:/home/DEV/.local/bin:${PATH}"
+ENV PATH="/home/DEV/go/bin:/home/DEV/.local/bin:${PATH}"
+RUN uv tool install -p 3.13 serena-agent
 
 RUN java -version && \
     python3 --version && \
