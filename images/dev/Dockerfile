@@ -26,13 +26,14 @@ WORKDIR /home/DEV
 
 RUN NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ENV PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:${PATH}"
-RUN CI=1 HOMEBREW_NO_AUTO_UPDATE=1 brew install go node python@3.12 rust openjdk dotnet proto protobuf opencode grpcurl gost
+RUN CI=1 HOMEBREW_NO_AUTO_UPDATE=1 brew install go node python@3.12 rust openjdk dotnet proto protobuf opencode grpcurl gost bun pulumi semgrep rust-analyzer gopls
 
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 RUN curl https://clickhouse.com/cli | sh
 RUN curl -fsSL https://code-server.dev/install.sh | sh
 RUN npm install -g pm2 gitnexus chrome-devtools-mcp@latest @deepseek-ai/dsh
 RUN curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash -s -- --skip-config
+RUN npm install -g @modelcontextprotocol/server-memory
 
 ENV PATH="/home/DEV/go/bin:/home/DEV/.local/bin:${PATH}"
 RUN uv tool install -p 3.13 serena-agent
