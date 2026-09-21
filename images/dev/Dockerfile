@@ -26,8 +26,8 @@ WORKDIR /home/DEV
 
 RUN NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ENV PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:${PATH}"
-RUN CI=1 HOMEBREW_NO_AUTO_UPDATE=1 brew install go node python@3.12 rust openjdk dotnet proto protobuf opencode grpcurl gost bun pulumi semgrep rust-analyzer gopls task flatbuffers less
-
+RUN CI=1 HOMEBREW_NO_AUTO_UPDATE=1 brew install go node python@3.12 rust openjdk dotnet proto protobuf grpcurl gost bun pulumi semgrep rust-analyzer gopls task flatbuffers less
+RUN curl -fsSL https://opencode.ai/v2/install | bash
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 RUN curl https://clickhouse.com/cli | sh
 RUN curl -fsSL https://code-server.dev/install.sh | sh
